@@ -8,13 +8,17 @@ import '@openzeppelin/contracts/token/ERC721/IERC721.sol';
 
 contract KingsCastle is Ownable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
     
     struct UserInfo {
-        EnumerableSet.UintSet tickets;
+        EnumerableSet.UintSet tokens;
         mapping(uint256 => uint256) avaibleClaimsPerToken;
         uint256 rewards;
         uint256 lastRewardBlock;
     }
+    
+    uint256 constant public MAX_CLAIMS = 10;
+    uint256 constant public MAX_AMOUNT_OF_DEPOSITORS = 10;
 
     IERC721 public lottery;
     uint256 public rewardPerBlock = 0.000001 ether;
@@ -22,7 +26,8 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     uint256 public endBlock;
     uint256 public maxClaims;
     
-    EnumerableSet.UintSet winningTickets;
+    EnumerableSet.UintSet winningTokens;
+    EnumerableSet.AddressSet depositors;
     mapping(address => UserInfo) private userInfo;
 
     event RewardPerBlockUpdated(uint256 oldValue, uint256 newValue);
@@ -33,7 +38,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     
     modifier onlyLottery() {
         require(
-            _msgSender() == address(lottery),
+            msg.sender == address(lottery),
             "only lottery can call this function"
         );
         _;
@@ -43,8 +48,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         IERC721 _lottery,
         uint256 _rewardPerBlock,
         uint256 _startBlock,
-        uint256 _endBlock,
-        uint256 _maxClaims
+        uint256 _endBlock
     ) {
         require(
             _rewardPerBlock > 0,
@@ -62,51 +66,64 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         rewardPerBlock = _rewardPerBlock;
         startBlock = _startBlock;
         endBlock = _endBlock;
-        maxClaims = _maxClaims;
+    }
+    
+    function addWinningToken(uint256 _tokenId) external onlyLottery {
+        winningTokens.add(_tokenId);
     }
     
     function stake(uint256 _tokenId) external nonReentrant {
         require(
-            winningTickets.contains(_tokenId),
+            winningTokens.contains(_tokenId),
             "not a winning ticket"
         );
-        claim();
+        require(
+            depositors.length() <= MAX_AMOUNT_OF_DEPOSITORS,
+            "max amount of depositors has been reached"
+        );
         IERC721(lottery).safeTransferFrom(
-            _msgSender(),
+            msg.sender,
             address(this),
             _tokenId
         );
-        UserInfo storage user = userInfo[_msgSender()];
-        user.tickets.add(_tokenId);
-        user.avaibleClaimsPerToken[_tokenId] = maxClaims;
-        emit Staked(_msgSender(), _tokenId);
+        if (!depositors.contains(msg.sender)) {
+            depositors.add(msg.sender);
+        }
+        claim();
+        UserInfo storage user = userInfo[msg.sender];
+        user.tokens.add(_tokenId);
+        user.avaibleClaimsPerToken[_tokenId] = MAX_CLAIMS;
+        emit Staked(msg.sender, _tokenId);
     }
     
-    function addTicket(uint256 _tokenId) external onlyLottery {
-        winningTickets.add(_tokenId);
-    }
-    
-    function claim() public nonReentrant {
-        UserInfo storage user = userInfo[_msgSender()];
-        uint256 pendingAmount = pendingRewards(_msgSender());
-        for (uint256 i = 0; i < user.tickets.length(); i++) {
-            uint256 tokenId = user.tickets.at(i);
+    function claim() external nonReentrant {
+        require(
+            depositors.contains(msg.sender),
+            "forbidden to claim"
+        );
+        UserInfo storage user = userInfo[msg.sender];
+        uint256 pendingAmount = pendingRewards(msg.sender);
+        if (pendingAmount > 0) {
+            uint256 amountSent = safeRewardTransfer(msg.sender, pendingAmount);
+            user.rewards = pendingAmount - amountSent;
+            emit Harvested(msg.sender, amountSent);
+        }
+        for (uint256 i = 0; i < user.tokens.length(); i++) {
+            uint256 tokenId = user.tokens.at(i);
             uint256 avaibleClaims = user.avaibleClaimsPerToken[tokenId]--;
             if (avaibleClaims == 0) {
-                user.tickets.remove(tokenId);
-                winningTickets.remove(tokenId);
+                user.tokens.remove(tokenId);
+                winningTokens.remove(tokenId);
+            }
+            if (user.tokens.length() == 0) {
+                depositors.remove(msg.sender);
             }
         }
-        if (pendingAmount > 0) {
-            uint256 amountSent = safeRewardTransfer(_msgSender(), pendingAmount);
-            user.rewards = pendingAmount - amountSent;
-            user.lastRewardBlock = block.number;
-            emit Harvested(_msgSender(), amountSent);
-        }
+        user.lastRewardBlock = block.number;
     }
     
     function updateRewardPerBlock(uint256 _rewardPerBlock) external onlyOwner {
-        require(_rewardPerBlock > 0, "Invalid reward per block");
+        require(_rewardPerBlock > 0, "invalid reward per block");
         emit RewardPerBlockUpdated(rewardPerBlock, _rewardPerBlock);
         rewardPerBlock = _rewardPerBlock;
     }
@@ -114,27 +131,23 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     function updateStartBlock(uint256 _startBlock) external onlyOwner {
         require(
             _startBlock <= endBlock,
-            "Start block must be before end block"
+            "start block must be before end block"
         );
-        require(_startBlock > block.number, "Start block must be after current block");
-        require(startBlock > block.number, "Staking started already");
+        require(_startBlock > block.number, "start block must be after current block");
+        require(startBlock > block.number, "staking started already");
         startBlock = _startBlock;
     }
 
     function updateEndBlock(uint256 _endBlock) external onlyOwner {
         require(
             _endBlock >= startBlock,
-            "End block must be after start block"
+            "end block must be after start block"
         );
         require(
             _endBlock > block.number,
-            "End block must be after current block"
+            "end block must be after current block"
         );
         endBlock = _endBlock;
-    }
-    
-    function updateMaxClaims(uint256 _maxClaims) external onlyOwner {
-        maxClaims = _maxClaims;
     }
 
     function viewUserInfo(
@@ -143,7 +156,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         external
         view
         returns (
-            uint256[] memory tickets,
+            uint256[] memory tokens,
             uint256 rewards,
             uint256 lastRewardBlock
         )
@@ -151,14 +164,14 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         UserInfo storage user = userInfo[__account];
         rewards = user.rewards;
         lastRewardBlock = user.lastRewardBlock;
-        uint256 countNfts = user.tickets.length();
+        uint256 countNfts = user.tokens.length();
         if (countNfts == 0) {
-            tickets = new uint256[](0);
+            tokens = new uint256[](0);
         } else {
-            tickets = new uint256[](countNfts);
+            tokens = new uint256[](countNfts);
             uint256 index;
             for (index = 0; index < countNfts; index++) {
-                tickets[index] = tokenOfOwnerByIndex(__account, index);
+                tokens[index] = tokenOfOwnerByIndex(__account, index);
             }
         }
     }
@@ -172,7 +185,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         returns (uint256)
     {
         UserInfo storage user = userInfo[__account];
-        return user.tickets.at(__index);
+        return user.tokens.at(__index);
     }
 
     function userStakedNFTCount(
@@ -183,19 +196,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         returns (uint256)
     {
         UserInfo storage user = userInfo[__account];
-        return user.tickets.length();
-    }
-
-    function isStaked(
-        address __account,
-        uint256 __tokenId
-    )
-        public
-        view
-        returns (bool)
-    {
-        UserInfo storage user = userInfo[__account];
-        return user.tickets.contains(__tokenId);
+        return user.tokens.length();
     }
 
     function pendingRewards(address _account) public view returns (uint256) {

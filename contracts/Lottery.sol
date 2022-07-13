@@ -89,7 +89,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         }
     }
     
-    function withdrawEther(uint256 _nonce) external {
+    function withdraw(uint256 _nonce) external {
         require(
             statePerLottery[_nonce] == State.FAILED,
             "allowed to withdraw only when lottery failed"
@@ -141,8 +141,8 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
     {
         uint256 winningTokenId = _randomness % AMOUNT_OF_TOKENS_PER_LOTTERY + previousSupply;
         address winner = ownerOf(winningTokenId);
-        _distributeTokens(winner);
-        IKingsCastle(kingsCastle).addTicket(winningTokenId);
+        _distribute(winner);
+        IKingsCastle(kingsCastle).addWinningToken(winningTokenId);
         previousSupply = currentSupply;
         statePerLottery[nonce] = State.CLOSED;
     }
@@ -151,7 +151,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         return BASE_URI;
     }
 
-    function _distributeTokens(address _winner) private {
+    function _distribute(address _winner) private {
         payable(kingsCastle).transfer(1 ether);
         payable(seaOfRedemption).transfer(4 ether);
         payable(devWallet).transfer(1 ether);
