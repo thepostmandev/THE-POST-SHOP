@@ -18,7 +18,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     }
 
     IERC721 public lottery;
-    uint256 public rewardPerBlock = 0.000001 ether;
+    uint256 public rewardPerBlock;
     uint256 public startBlock;
     uint256 public endBlock;
     uint256 public maxClaims;
@@ -30,7 +30,6 @@ contract KingsCastle is Ownable, ReentrancyGuard {
 
     event RewardPerBlockUpdated(uint256 oldValue, uint256 newValue);
     event Staked(address indexed account, uint256 tokenId);
-    event Withdrawn(address indexed account, uint256 tokenId);
     event Harvested(address indexed account, uint256 amount);
     event InsufficientRewardToken(address indexed account, uint256 amountNeeded, uint256 balance);
     

@@ -70,12 +70,12 @@ contract Factory is Ownable {
         );
         kingsCastles.push(address(kingsCastle));
         emit KingsCastleCreated(
-          address(kingsCastle)
-          _rewardPerBlock,
-          _startBlock,
-          _endBlock,
-          _maxClaims,
-          _maxAmountOfStakers
+            address(kingsCastle)
+            _rewardPerBlock,
+            _startBlock,
+            _endBlock,
+            _maxClaims,
+            _maxAmountOfStakers
         )
     }
     
