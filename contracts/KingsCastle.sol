@@ -91,32 +91,6 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         emit Staked(msg.sender, _tokenId);
     }
     
-    function claim() external nonReentrant {
-        require(
-            stakers.contains(msg.sender),
-            "forbidden to claim"
-        );
-        UserInfo storage user = userInfo[msg.sender];
-        uint256 pendingAmount = pendingRewards(msg.sender);
-        if (pendingAmount > 0) {
-            uint256 amountSent = safeRewardTransfer(msg.sender, pendingAmount);
-            user.rewards = pendingAmount - amountSent;
-            emit Harvested(msg.sender, amountSent);
-        }
-        for (uint256 i = 0; i < user.tokens.length(); i++) {
-            uint256 tokenId = user.tokens.at(i);
-            uint256 avaibleClaims = user.avaibleClaimsPerToken[tokenId]--;
-            if (avaibleClaims == 0) {
-                user.tokens.remove(tokenId);
-                winningTokens.remove(tokenId);
-            }
-            if (user.tokens.length() == 0) {
-                stakers.remove(msg.sender);
-            }
-        }
-        user.lastRewardBlock = block.number;
-    }
-    
     function updateRewardPerBlock(uint256 _rewardPerBlock) external onlyOwner {
         require(_rewardPerBlock > 0, "invalid reward per block");
         emit RewardPerBlockUpdated(rewardPerBlock, _rewardPerBlock);
@@ -169,6 +143,32 @@ contract KingsCastle is Ownable, ReentrancyGuard {
                 tokens[index] = tokenOfOwnerByIndex(__account, index);
             }
         }
+    }
+    
+    function claim() public nonReentrant {
+        require(
+            stakers.contains(msg.sender),
+            "forbidden to claim"
+        );
+        UserInfo storage user = userInfo[msg.sender];
+        uint256 pendingAmount = pendingRewards(msg.sender);
+        if (pendingAmount > 0) {
+            uint256 amountSent = safeRewardTransfer(msg.sender, pendingAmount);
+            user.rewards = pendingAmount - amountSent;
+            emit Harvested(msg.sender, amountSent);
+        }
+        for (uint256 i = 0; i < user.tokens.length(); i++) {
+            uint256 tokenId = user.tokens.at(i);
+            uint256 avaibleClaims = user.avaibleClaimsPerToken[tokenId]--;
+            if (avaibleClaims == 0) {
+                user.tokens.remove(tokenId);
+                winningTokens.remove(tokenId);
+            }
+            if (user.tokens.length() == 0) {
+                stakers.remove(msg.sender);
+            }
+        }
+        user.lastRewardBlock = block.number;
     }
 
     function tokenOfOwnerByIndex(

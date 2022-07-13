@@ -2,12 +2,15 @@
 pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./KingsCastle.sol";
 import "./Lottery.sol";
 
 contract Factory is Ownable {
-    address[] public kingsCastles;
-    address[] public lotteries;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    
+    EnumerableSet.AddressSet kingsCastles;
+    EnumerableSet.AddressSet lotteries;
     
     event KingsCastleCreated(
         address kingsCastleAddress,
@@ -31,12 +34,21 @@ contract Factory is Ownable {
         string symbol
     );
     
-    function amountOfKingsCastles() external view returns (uint256) {
-        return kingsCastles.length;
+    
+    function removeKingsCastle(address _kingsCastle) external onlyOwner {
+        require(
+            kingsCastles.contains(_kingsCastle),
+            "kings castle not found"
+        );
+        kingsCastles.remove(_kingsCastle);
     }
     
-    function amountOfLotteries() external view returns (uint256) {
-        return lotteries.length;
+    function removeLottery(address _lottery) external onlyOwner {
+        require(
+            lotteries.contains(_lottery),
+            "lottery not found"
+        );
+        lotteries.remove(_lottery);
     }
     
     function createKingsCastle(
@@ -68,15 +80,15 @@ contract Factory is Ownable {
             _maxClaims,
             _maxAmountOfStakers
         );
-        kingsCastles.push(address(kingsCastle));
+        kingsCastles.add(address(kingsCastle));
         emit KingsCastleCreated(
-            address(kingsCastle)
+            address(kingsCastle),
             _rewardPerBlock,
             _startBlock,
             _endBlock,
             _maxClaims,
             _maxAmountOfStakers
-        )
+        );
     }
     
     function createLottery(
@@ -108,7 +120,7 @@ contract Factory is Ownable {
             _name,
             _symbol
         );
-        lotteries.push(address(lottery));
+        lotteries.add(address(lottery));
         emit LotteryCreated(
             address(lottery),
             _kingsCastle,
@@ -120,6 +132,38 @@ contract Factory is Ownable {
             _amountOfTokensPerLottery,
             _name,
             _symbol
-        )
+        );
+    }
+    
+    function getKingsCastleAt(uint256 _index) external view returns (address) {
+        require(
+            kingsCastles.length() > 0,
+            "empty set"
+        );
+        require(
+            _index < kingsCastles.length(),
+            "invalid index"
+        );
+        return kingsCastles.at(_index);
+    }
+    
+    function getLotteryAt(uint256 _index) external view returns (address) {
+        require(
+            lotteries.length() > 0,
+            "empty set"
+        );
+        require(
+            _index < lotteries.length(),
+            "invalid index"
+        );
+        return lotteries.at(_index);
+    }
+    
+    function amountOfKingsCastles() external view returns (uint256) {
+        return kingsCastles.length();
+    }
+    
+    function amountOfLotteries() external view returns (uint256) {
+        return lotteries.length();
     }
 }
