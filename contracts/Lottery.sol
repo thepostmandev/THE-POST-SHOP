@@ -9,13 +9,13 @@ import "./interfaces/IKingsCastle.sol";
 contract Lottery is ERC721, VRFConsumerBase, Ownable {
     enum State { OPEN, CLOSED, FAILED }
     
-    uint256 public constant PRICE = 0.015 ether;
-    uint256 public constant AMOUNT_OF_TOKENS_PER_LOTTERY = 500;
-    uint256 public constant LOTTERY_DURATION = 180 days;
+    uint256 public constant lotteryDuration = 180 days;
     
     uint256 public maxSupply = 500;
     uint256 public currentSupply;
     uint256 public lotteryEndTime;
+    uint256 public price;
+    uint256 public amountOfTokensPerLottery;
     uint256 public nonce;
     uint256 private previousSupply;
     uint256 private chainlinkFee;
@@ -39,6 +39,8 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         address _devWallet,
         bytes32 _keyHash,
         uint256 _chainlinkFee,
+        uint256 _price,
+        uint256 _amountOfTokensPerLottery,
         string memory _name,
         string memory _symbol
     )
@@ -50,8 +52,10 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         devWallet = _devWallet;
         keyHash = _keyHash;
         chainlinkFee = _chainlinkFee;
+        price = _price;
+        amountOfTokensPerLottery = _amountOfTokensPerLottery;
         statePerLottery[nonce] = State.OPEN;
-        lotteryEndTime = block.timestamp + LOTTERY_DURATION;
+        lotteryEndTime = block.timestamp + lotteryDuration;
     }
 
     receive() external payable onlyOwner {}
@@ -63,11 +67,11 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         );
         require(
             _amount > 0 &&
-            _amount <= AMOUNT_OF_TOKENS_PER_LOTTERY,
+            _amount <= amountOfTokensPerLottery,
             "invalid amount"
         );
         require(
-            msg.value == _amount * PRICE,
+            msg.value == _amount * price,
             "invalid msg.value"
         );
         require(
@@ -98,7 +102,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
             withdrawals[msg.sender][_nonce] == false,
             "re-attempt to withdrawal"
         );
-        uint256 amount = tokensOfUserPerLottery[msg.sender][_nonce].length * PRICE;
+        uint256 amount = tokensOfUserPerLottery[msg.sender][_nonce].length * price;
         payable(msg.sender).transfer(amount);
         withdrawals[msg.sender][_nonce] = true;
     }
@@ -126,10 +130,10 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
             statePerLottery[nonce] == State.FAILED,
             "cannot start a new lottery until the current one is open"
         );
-        maxSupply = currentSupply + AMOUNT_OF_TOKENS_PER_LOTTERY;
+        maxSupply = currentSupply + amountOfTokensPerLottery;
         nonce++;
         statePerLottery[nonce] = State.OPEN;
-        lotteryEndTime = block.timestamp + LOTTERY_DURATION;
+        lotteryEndTime = block.timestamp + lotteryDuration;
     }
     
     function fulfillRandomness(
@@ -139,7 +143,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         internal
         override
     {
-        uint256 winningTokenId = _randomness % AMOUNT_OF_TOKENS_PER_LOTTERY + previousSupply;
+        uint256 winningTokenId = _randomness % amountOfTokensPerLottery + previousSupply;
         address winner = ownerOf(winningTokenId);
         _distribute(winner);
         IKingsCastle(kingsCastle).addWinningToken(winningTokenId);

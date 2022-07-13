@@ -16,18 +16,16 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         uint256 rewards;
         uint256 lastRewardBlock;
     }
-    
-    uint256 constant public MAX_CLAIMS = 10;
-    uint256 constant public MAX_AMOUNT_OF_DEPOSITORS = 10;
 
     IERC721 public lottery;
     uint256 public rewardPerBlock = 0.000001 ether;
     uint256 public startBlock;
     uint256 public endBlock;
     uint256 public maxClaims;
+    uint256 public maxAmountOfStakers;
     
     EnumerableSet.UintSet winningTokens;
-    EnumerableSet.AddressSet depositors;
+    EnumerableSet.AddressSet stakers;
     mapping(address => UserInfo) private userInfo;
 
     event RewardPerBlockUpdated(uint256 oldValue, uint256 newValue);
@@ -45,27 +43,21 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     }
 
     constructor(
-        IERC721 _lottery,
         uint256 _rewardPerBlock,
         uint256 _startBlock,
-        uint256 _endBlock
+        uint256 _endBlock,
+        uint256 _maxClaims,
+        uint256 _maxAmountOfStakers
     ) {
-        require(
-            _rewardPerBlock > 0,
-            "invalid reward per block"
-        );
-        require(
-            _startBlock <= _endBlock,
-            "start block must be before end block"
-        );
-        require(
-            _startBlock > block.number,
-            "start block must be after current block"
-        );
-        lottery = _lottery;
         rewardPerBlock = _rewardPerBlock;
         startBlock = _startBlock;
         endBlock = _endBlock;
+        maxClaims = _maxClaims;
+        maxAmountOfStakers = _maxAmountOfStakers;
+    }
+    
+    function setLottery(IERC721 _lottery) external onlyOwner {
+        lottery = _lottery;
     }
     
     function addWinningToken(uint256 _tokenId) external onlyLottery {
@@ -78,27 +70,31 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             "not a winning ticket"
         );
         require(
-            depositors.length() <= MAX_AMOUNT_OF_DEPOSITORS,
-            "max amount of depositors has been reached"
+            stakers.length() <= maxAmountOfStakers,
+            "max amount of stakers has been reached"
         );
         IERC721(lottery).safeTransferFrom(
             msg.sender,
             address(this),
             _tokenId
         );
-        if (!depositors.contains(msg.sender)) {
-            depositors.add(msg.sender);
+        if (!stakers.contains(msg.sender)) {
+            stakers.add(msg.sender);
         }
-        claim();
         UserInfo storage user = userInfo[msg.sender];
+        if (user.tokens.length() != 0) {
+            claim();
+        } else {
+            user.lastRewardBlock = block.number;
+        }
         user.tokens.add(_tokenId);
-        user.avaibleClaimsPerToken[_tokenId] = MAX_CLAIMS;
+        user.avaibleClaimsPerToken[_tokenId] = maxClaims;
         emit Staked(msg.sender, _tokenId);
     }
     
     function claim() external nonReentrant {
         require(
-            depositors.contains(msg.sender),
+            stakers.contains(msg.sender),
             "forbidden to claim"
         );
         UserInfo storage user = userInfo[msg.sender];
@@ -116,7 +112,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
                 winningTokens.remove(tokenId);
             }
             if (user.tokens.length() == 0) {
-                depositors.remove(msg.sender);
+                stakers.remove(msg.sender);
             }
         }
         user.lastRewardBlock = block.number;
