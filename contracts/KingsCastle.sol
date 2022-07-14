@@ -73,11 +73,6 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             winningTokens.contains(_tokenId),
             "not a winning ticket"
         );
-        lottery.transferFrom(
-            msg.sender,
-            address(this),
-            _tokenId
-        );
         if (!stakers.contains(msg.sender)) {
             stakers.add(msg.sender);
             require(
@@ -85,6 +80,11 @@ contract KingsCastle is Ownable, ReentrancyGuard {
                 "max amount of stakers has been reached"
             );
         }
+        lottery.transferFrom(
+            msg.sender,
+            address(this),
+            _tokenId
+        );
         UserInfo storage user = userInfo[msg.sender];
         if (user.tokens.length() != 0) {
             claim();
