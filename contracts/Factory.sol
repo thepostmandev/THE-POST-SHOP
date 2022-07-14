@@ -3,10 +3,11 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "./interfaces/ILottery.sol";
 import "./KingsCastle.sol";
 import "./Lottery.sol";
 
-contract Factory is Ownable {
+contract Factory is Ownable, ILottery {
     using EnumerableSet for EnumerableSet.AddressSet;
     
     EnumerableSet.AddressSet kingsCastles;
@@ -26,10 +27,9 @@ contract Factory is Ownable {
         address kingsCastle,
         address seaOfRedemption,
         address devWallet,
-        bytes32 keyHash,
-        uint256 chainlinkFee,
         uint256 price,
         uint256 amountOfTokensPerLottery,
+        Distribution distribution,
         string name,
         string symbol
     );
@@ -97,10 +97,9 @@ contract Factory is Ownable {
         address _kingsCastle,
         address _seaOfRedemption,
         address _devWallet,
-        bytes32 _keyHash,
-        uint256 _chainlinkFee,
         uint256 _price,
         uint256 _amountOfTokensPerLottery,
+        Distribution memory _distribution,
         string memory _name,
         string memory _symbol
     )
@@ -113,10 +112,9 @@ contract Factory is Ownable {
             _kingsCastle,
             _seaOfRedemption,
             _devWallet,
-            _keyHash,
-            _chainlinkFee,
             _price,
             _amountOfTokensPerLottery,
+            _distribution,
             _name,
             _symbol
         );
@@ -126,10 +124,9 @@ contract Factory is Ownable {
             _kingsCastle,
             _seaOfRedemption,
             _devWallet,
-            _keyHash,
-            _chainlinkFee,
             _price,
             _amountOfTokensPerLottery,
+            _distribution,
             _name,
             _symbol
         );

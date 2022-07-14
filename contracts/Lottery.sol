@@ -5,25 +5,28 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "./base/ERC721.sol";
 import "./interfaces/IKingsCastle.sol";
+import "./interfaces/ILottery.sol";
 
-contract Lottery is ERC721, VRFConsumerBase, Ownable {
+contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     enum State { OPEN, CLOSED, FAILED }
     
-    uint256 public constant lotteryDuration = 180 days;
+    uint256 public constant LOTTERY_DURATION = 180 days;
+    /* WARNING: don't forget to change it in MAINNET */
+    uint256 private constant CHAINLINK_FEE = 0.1 ether;
+    bytes32 private constant KEY_HASH = 0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311;
     
-    uint256 public maxSupply = 500;
+    uint256 public maxSupply;
     uint256 public currentSupply;
     uint256 public lotteryEndTime;
     uint256 public price;
     uint256 public amountOfTokensPerLottery;
     uint256 public nonce;
     uint256 private previousSupply;
-    uint256 private chainlinkFee;
     address public kingsCastle;
     address public seaOfRedemption;
     address public devWallet;
     string private BASE_URI;
-    bytes32 private keyHash;
+    Distribution private distribution;
     
     mapping(address => mapping(uint256 => uint256[])) public tokensOfUserPerLottery;
     mapping(address => mapping(uint256 => bool)) public withdrawals;
@@ -37,10 +40,9 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         address _kingsCastle,
         address _seaOfRedemption,
         address _devWallet,
-        bytes32 _keyHash,
-        uint256 _chainlinkFee,
         uint256 _price,
         uint256 _amountOfTokensPerLottery,
+        Distribution memory _distribution,
         string memory _name,
         string memory _symbol
     )
@@ -50,17 +52,17 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         kingsCastle = _kingsCastle;
         seaOfRedemption = _seaOfRedemption;
         devWallet = _devWallet;
-        keyHash = _keyHash;
-        chainlinkFee = _chainlinkFee;
         price = _price;
         amountOfTokensPerLottery = _amountOfTokensPerLottery;
+        maxSupply = _amountOfTokensPerLottery;
+        distribution = _distribution;
         statePerLottery[nonce] = State.OPEN;
-        lotteryEndTime = block.timestamp + lotteryDuration;
+        lotteryEndTime = block.timestamp + LOTTERY_DURATION;
     }
 
     receive() external payable onlyOwner {}
 
-    function buy(uint256 _amount) external payable {
+    function buyTickets(uint256 _amount) external payable {
         require(
             statePerLottery[nonce] == State.OPEN,
             "lottery closed or failed"
@@ -79,7 +81,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
             "max supply exceeded"
         );
         require(
-            LINK.balanceOf(address(this)) >= chainlinkFee,
+            LINK.balanceOf(address(this)) >= CHAINLINK_FEE,
             "not enough LINK"
         );
         for (uint256 i = 0; i < _amount; i++) {
@@ -88,12 +90,12 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
             currentSupply++;
         }
         if (currentSupply == maxSupply) {
-            bytes32 requestId = requestRandomness(keyHash, chainlinkFee);
+            bytes32 requestId = requestRandomness(KEY_HASH, CHAINLINK_FEE);
             emit RandomnessRequested(requestId);
         }
     }
     
-    function withdraw(uint256 _nonce) external {
+    function withdrawFunds(uint256 _nonce) external {
         require(
             statePerLottery[_nonce] == State.FAILED,
             "allowed to withdraw only when lottery failed"
@@ -133,7 +135,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
         maxSupply = currentSupply + amountOfTokensPerLottery;
         nonce++;
         statePerLottery[nonce] = State.OPEN;
-        lotteryEndTime = block.timestamp + lotteryDuration;
+        lotteryEndTime = block.timestamp + LOTTERY_DURATION;
     }
     
     function fulfillRandomness(
@@ -156,9 +158,9 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable {
     }
 
     function _distribute(address _winner) private {
-        payable(kingsCastle).transfer(1 ether);
-        payable(seaOfRedemption).transfer(4 ether);
-        payable(devWallet).transfer(1 ether);
-        payable(_winner).transfer(1.5 ether);
+        payable(kingsCastle).transfer(distribution.toKingsCastle);
+        payable(seaOfRedemption).transfer(distribution.toSeaOfRedemption);
+        payable(devWallet).transfer(distribution.toDevWallet);
+        payable(_winner).transfer(distribution.toWinner);
     }
 }
