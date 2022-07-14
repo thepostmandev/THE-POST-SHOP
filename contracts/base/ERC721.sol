@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.7;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
@@ -9,7 +8,7 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
+contract ERC721 is Context, ERC165, IERC721Metadata {
     using Address for address;
     using Strings for uint256;
 
@@ -271,7 +270,7 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
         bool approved
     ) internal virtual {
         require(
-            owner != operator, 
+            owner != operator,
             "ERC721: approve to caller"
         );
         _operatorApprovals[owner][operator] = approved;

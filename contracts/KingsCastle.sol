@@ -5,6 +5,7 @@ import '@openzeppelin/contracts/access/Ownable.sol';
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import '@openzeppelin/contracts/token/ERC721/IERC721.sol';
+import "hardhat/console.sol";
 
 contract KingsCastle is Ownable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -14,13 +15,11 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         EnumerableSet.UintSet tokens;
         mapping(uint256 => uint256) avaibleClaimsPerToken;
         uint256 rewards;
-        uint256 lastRewardBlock;
+        uint256 lastTimeRewardClaimed;
     }
 
     IERC721 public lottery;
-    uint256 public rewardPerBlock;
-    uint256 public startBlock;
-    uint256 public endBlock;
+    uint256 public rewardRate;
     uint256 public maxClaims;
     uint256 public maxAmountOfStakers;
     
@@ -42,18 +41,20 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     }
 
     constructor(
-        uint256 _rewardPerBlock,
-        uint256 _startBlock,
-        uint256 _endBlock,
+        address _owner,
+        uint256 _rewardRate,
         uint256 _maxClaims,
         uint256 _maxAmountOfStakers
-    ) {
-        rewardPerBlock = _rewardPerBlock;
-        startBlock = _startBlock;
-        endBlock = _endBlock;
+    )
+        Ownable()
+    {
+        transferOwnership(_owner);
+        rewardRate = _rewardRate;
         maxClaims = _maxClaims;
         maxAmountOfStakers = _maxAmountOfStakers;
     }
+    
+    receive() external payable onlyLottery {}
     
     function setLottery(IERC721 _lottery) external onlyOwner {
         lottery = _lottery;
@@ -72,64 +73,36 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             winningTokens.contains(_tokenId),
             "not a winning ticket"
         );
-        require(
-            stakers.length() <= maxAmountOfStakers,
-            "max amount of stakers has been reached"
-        );
-        lottery.safeTransferFrom(
+        lottery.transferFrom(
             msg.sender,
             address(this),
             _tokenId
         );
         if (!stakers.contains(msg.sender)) {
             stakers.add(msg.sender);
+            require(
+                stakers.length() <= maxAmountOfStakers,
+                "max amount of stakers has been reached"
+            );
         }
         UserInfo storage user = userInfo[msg.sender];
         if (user.tokens.length() != 0) {
             claim();
         } else {
-            user.lastRewardBlock = block.number;
+            user.lastTimeRewardClaimed = block.timestamp;
         }
         user.tokens.add(_tokenId);
         user.avaibleClaimsPerToken[_tokenId] = maxClaims;
         emit Staked(msg.sender, _tokenId);
     }
     
-    function updateRewardPerBlock(uint256 _rewardPerBlock) external onlyOwner {
+    function updateRewardRate(uint256 _rewardRate) external onlyOwner {
         require(
-            _rewardPerBlock > 0,
-            "invalid reward per block"
+            _rewardRate > 0,
+            "invalid reward rate"
         );
-        rewardPerBlock = _rewardPerBlock;
-        emit RewardPerBlockUpdated(rewardPerBlock, _rewardPerBlock);
-    }
-
-    function updateStartBlock(uint256 _startBlock) external onlyOwner {
-        require(
-            _startBlock <= endBlock,
-            "start block must be before end block"
-        );
-        require(
-            _startBlock > block.number,
-            "start block must be after current block"
-        );
-        require(
-            startBlock > block.number,
-            "staking started already"
-        );
-        startBlock = _startBlock;
-    }
-
-    function updateEndBlock(uint256 _endBlock) external onlyOwner {
-        require(
-            _endBlock >= startBlock,
-            "end block must be after start block"
-        );
-        require(
-            _endBlock > block.number,
-            "end block must be after current block"
-        );
-        endBlock = _endBlock;
+        rewardRate = _rewardRate;
+        emit RewardPerBlockUpdated(rewardRate, _rewardRate);
     }
 
     function viewUserInfo(
@@ -141,12 +114,12 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             uint256[] memory tokens,
             uint256[] memory avaibleClaimsPerToken,
             uint256 rewards,
-            uint256 lastRewardBlock
+            uint256 lastTimeRewardClaimed
         )
     {
         UserInfo storage user = userInfo[__account];
         rewards = user.rewards;
-        lastRewardBlock = user.lastRewardBlock;
+        lastTimeRewardClaimed = user.lastTimeRewardClaimed;
         uint256 amountOfTokens = user.tokens.length();
         if (amountOfTokens == 0) {
             tokens = new uint256[](0);
@@ -162,7 +135,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         }
     }
     
-    function claim() public nonReentrant {
+    function claim() public {
         require(
             stakers.contains(msg.sender),
             "forbidden to claim"
@@ -176,27 +149,24 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         }
         for (uint256 i = 0; i < user.tokens.length(); i++) {
             uint256 tokenId = user.tokens.at(i);
-            uint256 avaibleClaims = user.avaibleClaimsPerToken[tokenId]--;
+            user.avaibleClaimsPerToken[tokenId]--;
+            uint256 avaibleClaims = user.avaibleClaimsPerToken[tokenId];
             if (avaibleClaims == 0) {
                 user.tokens.remove(tokenId);
                 winningTokens.remove(tokenId);
             }
-            if (user.tokens.length() == 0) {
-                stakers.remove(msg.sender);
-            }
         }
-        user.lastRewardBlock = block.number;
+        if (user.tokens.length() == 0) {
+            stakers.remove(msg.sender);
+        }
+        user.lastTimeRewardClaimed = block.timestamp;
     }
     
     function pendingRewards(address _account) public view returns (uint256) {
         UserInfo storage user = userInfo[_account];
-        uint256 fromBlock = user.lastRewardBlock < startBlock ? startBlock : user.lastRewardBlock;
-        uint256 toBlock = block.number < endBlock ? block.number : endBlock;
-        if (toBlock < fromBlock) {
-            return user.rewards;
-        }
-        uint256 amount = (toBlock - fromBlock) * userStakedNFTCount(_account) * rewardPerBlock;
-        return user.rewards + amount;
+        uint256 timeBetween = block.timestamp - user.lastTimeRewardClaimed;
+        uint256 amount = timeBetween * userStakedNFTCount(_account) * rewardRate * 1e12 / winningTokens.length();
+        return user.rewards + amount / 1e12;
     }
     
     function userStakedNFTCount(

@@ -15,15 +15,15 @@ contract Factory is Ownable, ILottery {
     
     event KingsCastleCreated(
         address kingsCastleAddress,
-        uint256 rewardPerBlock,
-        uint256 startBlock,
-        uint256 endBlock,
+        address owner,
+        uint256 rewardRate,
         uint256 maxClaims,
         uint256 maxAmountOfStakers
     );
     
     event LotteryCreated(
         address lotteryAddress,
+        address owner,
         address kingsCastle,
         address seaOfRedemption,
         address devWallet,
@@ -52,9 +52,7 @@ contract Factory is Ownable, ILottery {
     }
     
     function createKingsCastle(
-        uint256 _rewardPerBlock,
-        uint256 _startBlock,
-        uint256 _endBlock,
+        uint256 _rewardRate,
         uint256 _maxClaims,
         uint256 _maxAmountOfStakers
     )
@@ -62,30 +60,20 @@ contract Factory is Ownable, ILottery {
         onlyOwner
     {
         require(
-            _rewardPerBlock > 0,
-            "invalid reward per block"
-        );
-        require(
-            _startBlock <= _endBlock,
-            "start block must be before end block"
-        );
-        require(
-            _startBlock > block.number,
-            "start block must be after current block"
+            _rewardRate > 0,
+            "invalid reward rate"
         );
         KingsCastle kingsCastle = new KingsCastle(
-            _rewardPerBlock,
-            _startBlock,
-            _endBlock,
+            owner(),
+            _rewardRate,
             _maxClaims,
             _maxAmountOfStakers
         );
         kingsCastles.add(address(kingsCastle));
         emit KingsCastleCreated(
             address(kingsCastle),
-            _rewardPerBlock,
-            _startBlock,
-            _endBlock,
+            owner(),
+            _rewardRate,
             _maxClaims,
             _maxAmountOfStakers
         );
@@ -107,6 +95,7 @@ contract Factory is Ownable, ILottery {
         onlyOwner
     {
         Lottery lottery = new Lottery(
+            owner(),
             _VRFCoordinator,
             _LINK,
             _kingsCastle,
@@ -121,6 +110,7 @@ contract Factory is Ownable, ILottery {
         lotteries.add(address(lottery));
         emit LotteryCreated(
             address(lottery),
+            owner(),
             _kingsCastle,
             _seaOfRedemption,
             _devWallet,

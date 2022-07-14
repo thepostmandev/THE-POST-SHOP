@@ -2,18 +2,21 @@
 pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "./base/ERC721.sol";
 import "./interfaces/IKingsCastle.sol";
 import "./interfaces/ILottery.sol";
+import "hardhat/console.sol";
 
 contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
-    enum State { OPEN, CLOSED, FAILED }
+    using EnumerableSet for EnumerableSet.UintSet;
+    
+    enum State { OPEN, FAILED }
     
     uint256 public constant LOTTERY_DURATION = 180 days;
-    /* WARNING: don't forget to change it in MAINNET */
-    uint256 private constant CHAINLINK_FEE = 0.1 ether;
-    bytes32 private constant KEY_HASH = 0x2ed0feb3e7fd2022120aa84fab1945545a9f2ffc9076fd6156fa96eaff4c1311;
+    uint256 private constant CHAINLINK_FEE = 2 ether;
+    bytes32 private constant KEY_HASH = 0xAA77729D3466CA35AE8D28B3BBAC7CC36A5031EFDC430821C02BC31A238AF445;
     
     uint256 public maxSupply;
     uint256 public currentSupply;
@@ -31,10 +34,13 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     mapping(address => mapping(uint256 => uint256[])) public tokensOfUserPerLottery;
     mapping(address => mapping(uint256 => bool)) public withdrawals;
     mapping(uint256 => State) public statePerLottery;
-
+    mapping(uint256 => address) public winnersPerLottery;
+    EnumerableSet.UintSet private winningTokens;
+    
     event RandomnessRequested(bytes32 requestId);
     
     constructor(
+        address _owner,
         address _VRFCoordinator,
         address _LINK,
         address _kingsCastle,
@@ -48,7 +54,9 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     )
         VRFConsumerBase(_VRFCoordinator, _LINK)
         ERC721(_name, _symbol, _kingsCastle, _seaOfRedemption)
+        Ownable()
     {
+        transferOwnership(_owner);
         kingsCastle = _kingsCastle;
         seaOfRedemption = _seaOfRedemption;
         devWallet = _devWallet;
@@ -63,10 +71,6 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     receive() external payable onlyOwner {}
 
     function buyTickets(uint256 _amount) external payable {
-        require(
-            statePerLottery[nonce] == State.OPEN,
-            "lottery closed or failed"
-        );
         require(
             _amount > 0 &&
             _amount <= amountOfTokensPerLottery,
@@ -118,24 +122,20 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
             block.timestamp >= lotteryEndTime,
             "it is too early to declare the lottery failed"
         );
-        require(
-            statePerLottery[nonce] == State.OPEN,
-            "only an open lottery can be declared failed"
-        );
         statePerLottery[nonce] = State.FAILED;
-        previousSupply = currentSupply;
+        startNewLottery();
     }
     
-    function startNewLottery() external onlyOwner {
+    function getWinningToken(uint256 _index) external view returns (uint256) {
         require(
-            statePerLottery[nonce] == State.CLOSED ||
-            statePerLottery[nonce] == State.FAILED,
-            "cannot start a new lottery until the current one is open"
+            winningTokens.length() > 0,
+            "empty set"
         );
-        maxSupply = currentSupply + amountOfTokensPerLottery;
-        nonce++;
-        statePerLottery[nonce] = State.OPEN;
-        lotteryEndTime = block.timestamp + LOTTERY_DURATION;
+        require(
+            _index < winningTokens.length(),
+            "invalid index"
+        );
+        return winningTokens.at(_index);
     }
     
     function fulfillRandomness(
@@ -145,16 +145,25 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
         internal
         override
     {
-        uint256 winningTokenId = _randomness % amountOfTokensPerLottery + previousSupply;
-        address winner = ownerOf(winningTokenId);
+        uint256 winningToken = _randomness % amountOfTokensPerLottery + previousSupply;
+        winningTokens.add(winningToken);
+        address winner = ownerOf(winningToken);
+        winnersPerLottery[nonce] = winner;
         _distribute(winner);
-        IKingsCastle(kingsCastle).addWinningToken(winningTokenId);
-        previousSupply = currentSupply;
-        statePerLottery[nonce] = State.CLOSED;
+        IKingsCastle(kingsCastle).addWinningToken(winningToken);
+        startNewLottery();
     }
     
     function _baseURI() internal view override returns (string memory) {
         return BASE_URI;
+    }
+    
+    function startNewLottery() private {
+        previousSupply = currentSupply;
+        maxSupply = currentSupply + amountOfTokensPerLottery;
+        nonce++;
+        statePerLottery[nonce] = State.OPEN;
+        lotteryEndTime = block.timestamp + LOTTERY_DURATION;
     }
 
     function _distribute(address _winner) private {
