@@ -22,14 +22,15 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     uint256 public rewardRate;
     uint256 public maxClaims;
     uint256 public maxAmountOfStakers;
+    uint256 public amountOfStakedTokens;
     
     EnumerableSet.UintSet winningTokens;
     EnumerableSet.AddressSet stakers;
     mapping(address => UserInfo) private userInfo;
 
     event RewardPerBlockUpdated(uint256 oldValue, uint256 newValue);
-    event Staked(address indexed account, uint256 tokenId);
-    event Harvested(address indexed account, uint256 amount);
+    event Stake(address indexed account, uint256 tokenId);
+    event Claim(address indexed account, uint256 amount);
     event InsufficientRewardToken(address indexed account, uint256 amountNeeded, uint256 balance);
     
     modifier onlyLottery() {
@@ -54,7 +55,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         maxAmountOfStakers = _maxAmountOfStakers;
     }
     
-    receive() external payable onlyLottery {}
+    receive() external payable {}
     
     function setLottery(IERC721 _lottery) external onlyOwner {
         lottery = _lottery;
@@ -92,8 +93,9 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             user.lastTimeRewardClaimed = block.timestamp;
         }
         user.tokens.add(_tokenId);
+        amountOfStakedTokens++;
         user.avaibleClaimsPerToken[_tokenId] = maxClaims;
-        emit Staked(msg.sender, _tokenId);
+        emit Stake(msg.sender, _tokenId);
     }
     
     function updateRewardRate(uint256 _rewardRate) external onlyOwner {
@@ -142,30 +144,28 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         );
         UserInfo storage user = userInfo[msg.sender];
         uint256 pendingAmount = pendingRewards(msg.sender);
-        if (pendingAmount > 0) {
-            uint256 amountSent = safeRewardTransfer(msg.sender, pendingAmount);
-            user.rewards = pendingAmount - amountSent;
-            emit Harvested(msg.sender, amountSent);
-        }
+        uint256 amountSent = safeRewardTransfer(msg.sender, pendingAmount);
+        user.rewards = pendingAmount - amountSent;
         for (uint256 i = 0; i < user.tokens.length(); i++) {
             uint256 tokenId = user.tokens.at(i);
             user.avaibleClaimsPerToken[tokenId]--;
-            uint256 avaibleClaims = user.avaibleClaimsPerToken[tokenId];
-            if (avaibleClaims == 0) {
+            if (user.avaibleClaimsPerToken[tokenId] == 0) {
                 user.tokens.remove(tokenId);
                 winningTokens.remove(tokenId);
+                amountOfStakedTokens--;
             }
         }
         if (user.tokens.length() == 0) {
             stakers.remove(msg.sender);
         }
         user.lastTimeRewardClaimed = block.timestamp;
+        emit Claim(msg.sender, amountSent);
     }
     
     function pendingRewards(address _account) public view returns (uint256) {
         UserInfo storage user = userInfo[_account];
         uint256 timeBetween = block.timestamp - user.lastTimeRewardClaimed;
-        uint256 amount = timeBetween * userStakedNFTCount(_account) * rewardRate * 1e12 / winningTokens.length();
+        uint256 amount = (timeBetween * userStakedNFTCount(_account) * rewardRate * 1e12) / amountOfStakedTokens;
         return user.rewards + amount / 1e12;
     }
     
@@ -181,15 +181,15 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     }
 
     function tokenOfOwnerByIndex(
-        address __account,
-        uint256 __index
+        address _account,
+        uint256 _index
     )
         public
         view
         returns (uint256)
     {
-        UserInfo storage user = userInfo[__account];
-        return user.tokens.at(__index);
+        UserInfo storage user = userInfo[_account];
+        return user.tokens.at(_index);
     }
 
     function safeRewardTransfer(address _to, uint256 _amount) internal returns (uint256) {

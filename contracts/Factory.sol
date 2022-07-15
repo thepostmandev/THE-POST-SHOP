@@ -34,23 +34,6 @@ contract Factory is Ownable, ILottery {
         string symbol
     );
     
-    
-    function removeKingsCastle(address _kingsCastle) external onlyOwner {
-        require(
-            kingsCastles.contains(_kingsCastle),
-            "kings castle not found"
-        );
-        kingsCastles.remove(_kingsCastle);
-    }
-    
-    function removeLottery(address _lottery) external onlyOwner {
-        require(
-            lotteries.contains(_lottery),
-            "lottery not found"
-        );
-        lotteries.remove(_lottery);
-    }
-    
     function createKingsCastle(
         uint256 _rewardRate,
         uint256 _maxClaims,
@@ -59,10 +42,6 @@ contract Factory is Ownable, ILottery {
         external
         onlyOwner
     {
-        require(
-            _rewardRate > 0,
-            "invalid reward rate"
-        );
         KingsCastle kingsCastle = new KingsCastle(
             owner(),
             _rewardRate,
@@ -122,6 +101,22 @@ contract Factory is Ownable, ILottery {
         );
     }
     
+    function removeKingsCastle(address _kingsCastle) external onlyOwner {
+        require(
+            kingsCastles.contains(_kingsCastle),
+            "kings castle not found"
+        );
+        kingsCastles.remove(_kingsCastle);
+    }
+    
+    function removeLottery(address _lottery) external onlyOwner {
+        require(
+            lotteries.contains(_lottery),
+            "lottery not found"
+        );
+        lotteries.remove(_lottery);
+    }
+    
     function getKingsCastleAt(uint256 _index) external view returns (address) {
         require(
             kingsCastles.length() > 0,
@@ -134,6 +129,10 @@ contract Factory is Ownable, ILottery {
         return kingsCastles.at(_index);
     }
     
+    function amountOfKingsCastles() external view returns (uint256) {
+        return kingsCastles.length();
+    }
+    
     function getLotteryAt(uint256 _index) external view returns (address) {
         require(
             lotteries.length() > 0,
@@ -144,10 +143,6 @@ contract Factory is Ownable, ILottery {
             "invalid index"
         );
         return lotteries.at(_index);
-    }
-    
-    function amountOfKingsCastles() external view returns (uint256) {
-        return kingsCastles.length();
     }
     
     function amountOfLotteries() external view returns (uint256) {

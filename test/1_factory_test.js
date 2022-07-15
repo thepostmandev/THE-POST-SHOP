@@ -9,11 +9,6 @@ describe("Factory", function() {
     });
     
     it("Successful kings castle related functions execution", async() => {
-        await expect(factory.createKingsCastle(
-            0,
-            100,
-            100
-        )).to.be.revertedWith("invalid reward rate");
         await expect(factory.createKingsCastle(100, 100, 100)).to.emit(factory, "KingsCastleCreated");
         expect(await factory.amountOfKingsCastles()).to.equal(1);
         await expect(factory.getKingsCastleAt(1)).to.be.revertedWith("invalid index");
@@ -24,12 +19,7 @@ describe("Factory", function() {
     });
     
     it("Successful lottery related functions execution", async() => {
-        const distribution = [
-            100,
-            100,
-            100,
-            100
-        ]
+        const distribution = [100, 100, 100, 100]
         await expect(factory.createLottery(
             vrfCoordinator.address,
             link.address,

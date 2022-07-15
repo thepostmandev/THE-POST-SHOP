@@ -10,7 +10,7 @@ contract LinkToken is linkStandardToken, ERC677Token {
     uint8 public constant decimals = 18;
     string public constant symbol = "LINK";
 
-    function LinkToken() public {
+    constructor() public {
         balances[msg.sender] = totalSupply;
     }
 
