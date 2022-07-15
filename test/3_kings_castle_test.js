@@ -120,8 +120,7 @@ describe("KingsCastle", function() {
         await callBackWithRandomness(receipt);
         await lottery.approve(kingsCastle.address, 10);
         await kingsCastle.stake(10);
-        const index = await kingsCastle.tokenOfOwnerByIndex(owner.address, 0);
-        console.log(index);
+        await kingsCastle.tokenOfOwnerByIndex(owner.address, 0);
     });
     
     it("Successful viewUserInfo() execution", async() => {

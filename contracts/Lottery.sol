@@ -7,7 +7,6 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "./base/ERC721.sol";
 import "./interfaces/IKingsCastle.sol";
 import "./interfaces/ILottery.sol";
-import "hardhat/console.sol";
 
 contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -107,6 +106,10 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
         require(
             withdrawals[msg.sender][_nonce] == false,
             "re-attempt to withdrawal"
+        );
+        require(
+            tokensOfUserPerLottery[msg.sender][_nonce].length != 0,
+            "sender did not buy tokens on this lottery"
         );
         uint256 amount = tokensOfUserPerLottery[msg.sender][_nonce].length * price;
         payable(msg.sender).transfer(amount);

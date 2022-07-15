@@ -80,6 +80,7 @@ describe("Lottery", function() {
         await increaseTime(15552000);
         await lottery.declareLotteryFailed();
         await lottery.withdrawFunds(0);
+        await expect(lottery.connect(alice).withdrawFunds(0)).to.be.revertedWith("sender did not buy tokens on this lottery");
         await expect(lottery.withdrawFunds(0)).to.be.revertedWith("re-attempt to withdrawal");
     });
     
