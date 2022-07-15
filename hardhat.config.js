@@ -7,8 +7,7 @@ const { MAINNET, REPORT_GAS } = process.env;
 
 module.exports = {
     solidity: {
-        compilers: [
-        {
+        compilers: [{
             version: "0.8.7",
             settings: {
                 optimizer: {
@@ -19,8 +18,7 @@ module.exports = {
         },
         {
             version: "0.4.24"
-        }
-        ]
+        }]
     },
     gasReporter: {
         currency: 'USD',
