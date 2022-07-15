@@ -19,23 +19,30 @@ const increaseTime = async(time) => {
 
 describe("Lottery", function() {
     beforeEach(async function() {
-        [owner, alice, seaOfRedemption, devWallet] = await ethers.getSigners();
+        [owner, alice, devWallet] = await ethers.getSigners();
         const LinkToken = await ethers.getContractFactory("LinkToken");
         linkToken = await LinkToken.deploy();
         const VRFCoordinatorMock = await ethers.getContractFactory("VRFCoordinatorMock");
         vrfCoordinatorMock = await VRFCoordinatorMock.deploy(linkToken.address);
-        const Factory = await ethers.getContractFactory("Factory");
-        factory = await Factory.deploy();
-        await factory.createKingsCastle(BigNumber.from("115740740741"), 10, 10); // 0.01 ETH/DAY
-        const kingsCastleAddress = await factory.getKingsCastleAt(0);
+        const KingsCastleFactory = await ethers.getContractFactory("KingsCastleFactory");
+        kingsCastleFactory = await KingsCastleFactory.deploy();
+        await kingsCastleFactory.createKingsCastle(BigNumber.from("115740740741"), 10, 10); // 0.01 ETH/DAY
+        const kingsCastleAddress = await kingsCastleFactory.getKingsCastleAt(0);
+        const SeaOfRedemptionFactory = await ethers.getContractFactory("SeaOfRedemptionFactory");
+        seaOfRedemptionFactory = await SeaOfRedemptionFactory.deploy();
+        await seaOfRedemptionFactory.createSeaOfRedemption(BigNumber.from("115740740741"), 10, 10); // 0.01 ETH/DAY
+        const seaOfRedemptionAddress = await seaOfRedemptionFactory.getSeaOfRedemptionAt(0);
         kingsCastle = await ethers.getContractAt("KingsCastle", kingsCastleAddress);
+        seaOfRedemption = await ethers.getContractAt("SeaOfRedemption", seaOfRedemptionAddress);
         distribution = [
             ethers.utils.parseEther("0.1"),
             ethers.utils.parseEther("0.4"),
             ethers.utils.parseEther("0.1"),
             ethers.utils.parseEther("0.15")
         ];
-        await factory.createLottery(
+        const LotteryFactory = await ethers.getContractFactory("LotteryFactory");
+        lotteryFactory = await LotteryFactory.deploy();
+        await lotteryFactory.createLottery(
             vrfCoordinatorMock.address,
             linkToken.address,
             kingsCastle.address,
@@ -47,9 +54,10 @@ describe("Lottery", function() {
             "Mini Chad - Tier 1",
             "MCT1"
         );
-        const lotteryAddress = await factory.getLotteryAt(0);
+        const lotteryAddress = await lotteryFactory.getLotteryAt(0);
         lottery = await ethers.getContractAt("Lottery", lotteryAddress);
         await kingsCastle.setLottery(lottery.address);
+        await seaOfRedemption.setLottery(lottery.address);
     });
     
     it("Successful buyTickets() execution", async() => {
@@ -64,10 +72,10 @@ describe("Lottery", function() {
         balanceBefore = await ethers.provider.getBalance(alice.address);
         await callBackWithRandomness(receipt);
         balanceAfter = await ethers.provider.getBalance(alice.address);
-        const winner = await lottery.winnersPerLottery(0);
+        const winner = await lottery.winnerPerLottery(0);
         expect(winner).to.equal(alice.address);
         expect(await ethers.provider.getBalance(kingsCastle.address)).to.equal(ethers.utils.parseEther("0.1"));
-        expect((await ethers.provider.getBalance(seaOfRedemption.address)).sub(ethers.utils.parseEther("10000"))).to.equal(ethers.utils.parseEther("0.4"));
+        expect(await ethers.provider.getBalance(seaOfRedemption.address)).to.equal(ethers.utils.parseEther("0.4"));
         expect((await ethers.provider.getBalance(devWallet.address)).sub(ethers.utils.parseEther("10000"))).to.equal(ethers.utils.parseEther("0.1"));
         expect(balanceAfter.sub(balanceBefore)).to.equal(ethers.utils.parseEther("0.15"));
     });

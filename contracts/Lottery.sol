@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
 import "./base/ERC721.sol";
 import "./interfaces/IKingsCastle.sol";
+import "./interfaces/ISeaOfRedemption.sol";
 import "./interfaces/ILottery.sol";
 
 contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
@@ -33,7 +34,7 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     mapping(address => mapping(uint256 => uint256[])) public tokensOfUserPerLottery;
     mapping(address => mapping(uint256 => bool)) public withdrawals;
     mapping(uint256 => State) public statePerLottery;
-    mapping(uint256 => address) public winnersPerLottery;
+    mapping(uint256 => address) public winnerPerLottery;
     EnumerableSet.UintSet private winningTokens;
     
     event RandomnessRequested(bytes32 requestId);
@@ -150,10 +151,11 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     {
         uint256 winningToken = _randomness % amountOfTokensPerLottery + previousSupply;
         winningTokens.add(winningToken);
-        address winner = ownerOf(winningToken);
-        winnersPerLottery[nonce] = winner;
-        _distribute(winner);
         IKingsCastle(kingsCastle).addWinningToken(winningToken);
+        ISeaOfRedemption(seaOfRedemption).addExcludedToken(winningToken);
+        address winner = ownerOf(winningToken);
+        winnerPerLottery[nonce] = winner;
+        _distribute(winner);
         startNewLottery();
     }
     

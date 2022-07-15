@@ -30,7 +30,7 @@ describe("KingsCastle", function() {
         const kingsCastleAddress = await kingsCastleFactory.getKingsCastleAt(0);
         const SeaOfRedemptionFactory = await ethers.getContractFactory("SeaOfRedemptionFactory");
         seaOfRedemptionFactory = await SeaOfRedemptionFactory.deploy();
-        await seaOfRedemptionFactory.createSeaOfRedemption(BigNumber.from("115740740741"), 10, 10); // 0.01 ETH/DAY
+        await seaOfRedemptionFactory.createSeaOfRedemption(BigNumber.from("115740740741"), 10, 2); // 0.01 ETH/DAY
         const seaOfRedemptionAddress = await seaOfRedemptionFactory.getSeaOfRedemptionAt(0);
         kingsCastle = await ethers.getContractAt("KingsCastle", kingsCastleAddress);
         seaOfRedemption = await ethers.getContractAt("SeaOfRedemption", seaOfRedemptionAddress);
@@ -66,25 +66,31 @@ describe("KingsCastle", function() {
         tx = await lottery.buyTickets(49, {value: ethers.utils.parseEther("0.735")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await expect(kingsCastle.stake(0)).to.be.revertedWith("sender is not the owner");
-        await expect(kingsCastle.connect(alice).stake(0)).to.be.revertedWith("not a winning ticket");
-        await lottery.approve(kingsCastle.address, 10);
-        await kingsCastle.stake(10);
+        tokens = [0];
+        await expect(seaOfRedemption.stake(tokens)).to.be.revertedWith("sender is not the owner");
+        tokens = [10];
+        await expect(seaOfRedemption.stake(tokens)).to.be.revertedWith("contains excluded token");
+        await lottery.approve(seaOfRedemption.address, 5);
+        tokens = [5];
+        await seaOfRedemption.stake(tokens);
         tx = await lottery.connect(alice).buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await lottery.connect(alice).approve(kingsCastle.address, 60);
-        await kingsCastle.connect(alice).stake(60);
+        await lottery.connect(alice).approve(seaOfRedemption.address, 55);
+        tokens = [55];
+        await seaOfRedemption.connect(alice).stake(tokens);
         tx = await lottery.buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await lottery.approve(kingsCastle.address, 110);
-        await kingsCastle.stake(110);
+        await lottery.approve(seaOfRedemption.address, 105);
+        tokens = [105];
+        await seaOfRedemption.stake(tokens);
         tx = await lottery.connect(bob).buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await lottery.connect(bob).approve(kingsCastle.address, 160);
-        await expect(kingsCastle.connect(bob).stake(160)).to.be.revertedWith("max amount of stakers has been reached");
+        await lottery.connect(bob).approve(seaOfRedemption.address, 165);
+        tokens = [165];
+        await expect(seaOfRedemption.connect(bob).stake(tokens)).to.be.revertedWith("max amount of stakers has been reached");
     });
     
     it("Successful claim() execution", async() => {
@@ -94,50 +100,54 @@ describe("KingsCastle", function() {
         tx = await lottery.connect(alice).buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await lottery.approve(kingsCastle.address, 10);
-        await kingsCastle.stake(10);
+        await lottery.approve(seaOfRedemption.address, 20);
+        tokens = [20];
+        await seaOfRedemption.stake(tokens);
         await increaseTime(86399);
-        await kingsCastle.claim();
-        await expect(kingsCastle.connect(bob).claim()).to.be.revertedWith("forbidden to claim");
-        await lottery.connect(alice).approve(kingsCastle.address, 60);
-        await kingsCastle.connect(alice).stake(60);
+        await seaOfRedemption.claim();
+        await expect(seaOfRedemption.connect(bob).claim()).to.be.revertedWith("forbidden to claim");
+        await lottery.connect(alice).approve(seaOfRedemption.address, 70);
+        tokens = [70];
+        await seaOfRedemption.connect(alice).stake(tokens);
         await increaseTime(86399);
-        await kingsCastle.connect(alice).claim();
+        await seaOfRedemption.connect(alice).claim();
         for (let i = 0; i < 9; i++) {
-            await kingsCastle.connect(alice).claim();
+            await seaOfRedemption.connect(alice).claim();
         }
-        await expect(kingsCastle.connect(alice).claim()).to.be.revertedWith("forbidden to claim");
+        await expect(seaOfRedemption.connect(alice).claim()).to.be.revertedWith("forbidden to claim");
         await increaseTime(15552000);
-        await kingsCastle.claim();
-        await kingsCastle.claim();
+        await seaOfRedemption.claim();
+        await seaOfRedemption.claim();
     });
     
     it("Successful onlyLottery() check", async() => {
-        await expect(kingsCastle.addWinningToken(10)).to.be.revertedWith("only lottery can call this function");
+        await expect(seaOfRedemption.addExcludedToken(10)).to.be.revertedWith("only lottery can call this function");
     });
     
     it("Successful updateRewardRate() execution", async() => {
-        await expect(kingsCastle.updateRewardRate(0)).to.be.revertedWith("invalid reward rate");
-        await kingsCastle.updateRewardRate(100);
+        await expect(seaOfRedemption.updateRewardRate(0)).to.be.revertedWith("invalid reward rate");
+        await seaOfRedemption.updateRewardRate(100);
     });
     
     it("Successful tokenOfOwnerByIndex() execution", async() => {
-        await expect(kingsCastle.tokenOfOwnerByIndex(owner.address, 0)).to.be.reverted;
+        await expect(seaOfRedemption.tokenOfOwnerByIndex(owner.address, 0)).to.be.reverted;
         tx = await lottery.buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await lottery.approve(kingsCastle.address, 10);
-        await kingsCastle.stake(10);
-        await kingsCastle.tokenOfOwnerByIndex(owner.address, 0);
+        await lottery.approve(seaOfRedemption.address, 20);
+        tokens = [20];
+        await seaOfRedemption.stake(tokens);
+        await seaOfRedemption.tokenOfOwnerByIndex(owner.address, 0);
     });
     
     it("Successful viewUserInfo() execution", async() => {
-        await kingsCastle.viewUserInfo(owner.address);
+        await seaOfRedemption.viewUserInfo(owner.address);
         tx = await lottery.buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await lottery.approve(kingsCastle.address, 10);
-        await kingsCastle.stake(10);
-        await kingsCastle.viewUserInfo(owner.address);
+        await lottery.approve(seaOfRedemption.address, 20);
+        tokens = [20];
+        await seaOfRedemption.stake(tokens);
+        await seaOfRedemption.viewUserInfo(owner.address);
     });
 });
