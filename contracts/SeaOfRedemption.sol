@@ -154,7 +154,6 @@ contract SeaOfRedemption is Ownable, ReentrancyGuard {
             user.avaibleClaimsPerToken[tokenId]--;
             if (user.avaibleClaimsPerToken[tokenId] == 0) {
                 user.tokens.remove(tokenId);
-                excludedTokens.add(tokenId);
                 amountOfStakedTokens--;
             }
         }

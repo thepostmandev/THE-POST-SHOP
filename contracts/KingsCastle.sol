@@ -92,8 +92,8 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             user.lastTimeRewardClaimed = block.timestamp;
         }
         user.tokens.add(_tokenId);
-        amountOfStakedTokens++;
         user.avaibleClaimsPerToken[_tokenId] = maxClaims;
+        amountOfStakedTokens++;
         emit Stake(msg.sender, _tokenId);
     }
     
