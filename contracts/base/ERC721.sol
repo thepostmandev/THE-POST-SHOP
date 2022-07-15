@@ -14,8 +14,8 @@ contract ERC721 is Context, ERC165, IERC721Metadata {
 
     string private _name;
     string private _symbol;
-    address private kingsCastle;
-    address private seaOfRedemption;
+    address private _kingsCastle;
+    address private _seaOfRedemption;
 
     mapping(uint256 => address) private _owners;
     mapping(address => uint256) private _balances;
@@ -24,8 +24,8 @@ contract ERC721 is Context, ERC165, IERC721Metadata {
      
     modifier onlyStakingPools() {
         require(
-            msg.sender == kingsCastle ||
-            msg.sender == seaOfRedemption,
+            msg.sender == _kingsCastle ||
+            msg.sender == _seaOfRedemption,
             "ERC721: only staking pools can transfer tokens"
         );
         _;
@@ -34,13 +34,13 @@ contract ERC721 is Context, ERC165, IERC721Metadata {
     constructor(
         string memory name_,
         string memory symbol_,
-        address _kingsCastle,
-        address _seaOfRedemption
+        address kingsCastle_,
+        address seaOfRedemption_
     ) {
         _name = name_;
         _symbol = symbol_;
-        kingsCastle = _kingsCastle;
-        seaOfRedemption = _seaOfRedemption;
+        _kingsCastle = kingsCastle_;
+        _seaOfRedemption = seaOfRedemption_;
     }
 
     function supportsInterface(
