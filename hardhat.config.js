@@ -1,9 +1,10 @@
 require("@nomiclabs/hardhat-ethers");
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-etherscan");
 require('solidity-coverage');
 require("hardhat-gas-reporter");
 require("dotenv").config();
-const { MAINNET, REPORT_GAS } = process.env;
+const { MAINNET, REPORT_GAS, API_KEY } = process.env;
 
 module.exports = {
     solidity: {
@@ -24,4 +25,7 @@ module.exports = {
         currency: 'USD',
         enabled: (REPORT_GAS === "true") ? true : false
     },
+    etherscan: {
+        apiKey: API_KEY
+    }
 };
