@@ -27,10 +27,10 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     EnumerableSet.AddressSet stakers;
     mapping(address => UserInfo) private userInfo;
 
-    event RewardPerBlockUpdated(uint256 oldValue, uint256 newValue);
+    event RewardRateUpdate(uint256 oldValue, uint256 newValue);
     event Stake(address indexed account, uint256 tokenId);
     event Claim(address indexed account, uint256 amount);
-    event InsufficientRewardToken(address indexed account, uint256 amountNeeded, uint256 balance);
+    event InsufficientReward(address indexed account, uint256 amountNeeded, uint256 balance);
     
     modifier onlyLottery() {
         require(
@@ -103,7 +103,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             "invalid reward rate"
         );
         rewardRate = _rewardRate;
-        emit RewardPerBlockUpdated(rewardRate, _rewardRate);
+        emit RewardRateUpdate(rewardRate, _rewardRate);
     }
 
     function viewUserInfo(
@@ -200,7 +200,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         if (balance > 0) {
             payable(_to).transfer(balance);
         }
-        emit InsufficientRewardToken(_to, _amount, balance);
+        emit InsufficientReward(_to, _amount, balance);
         return balance;
     }
 }
