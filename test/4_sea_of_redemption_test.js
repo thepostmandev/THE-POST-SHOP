@@ -17,7 +17,7 @@ const increaseTime = async(time) => {
     await ethers.provider.send("evm_mine");
 }
 
-describe("KingsCastle", function() {
+describe("SeaOfRedemption", function() {
     beforeEach(async function() {
         [owner, alice, bob, seaOfRedemption, devWallet] = await ethers.getSigners();
         const LinkToken = await ethers.getContractFactory("LinkToken");
