@@ -7,7 +7,6 @@ import "./SeaOfRedemption.sol";
 
 contract SeaOfRedemptionFactory is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
-    using Address for address;
     
     EnumerableSet.AddressSet private seasOfRedemption;
     
