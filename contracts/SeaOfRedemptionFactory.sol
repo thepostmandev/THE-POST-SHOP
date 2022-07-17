@@ -7,8 +7,9 @@ import "./SeaOfRedemption.sol";
 
 contract SeaOfRedemptionFactory is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
+    using Address for address;
     
-    EnumerableSet.AddressSet seasOfRedemption;
+    EnumerableSet.AddressSet private seasOfRedemption;
     
     event SeaOfRedemptionCreated(
         address seaOfRedemptionAddress,
@@ -43,22 +44,10 @@ contract SeaOfRedemptionFactory is Ownable {
     }
     
     function removeSeaOfRedemption(address _seaOfRedemption) external onlyOwner {
-        require(
-            seasOfRedemption.contains(_seaOfRedemption),
-            "sea of redemption not found"
-        );
         seasOfRedemption.remove(_seaOfRedemption);
     }
     
     function getSeaOfRedemptionAt(uint256 _index) external view returns (address) {
-        require(
-            seasOfRedemption.length() > 0,
-            "empty set"
-        );
-        require(
-            _index < seasOfRedemption.length(),
-            "invalid index"
-        );
         return seasOfRedemption.at(_index);
     }
     

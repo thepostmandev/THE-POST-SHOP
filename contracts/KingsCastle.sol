@@ -4,7 +4,9 @@ pragma solidity 0.8.7;
 import '@openzeppelin/contracts/access/Ownable.sol';
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import '@openzeppelin/contracts/token/ERC721/IERC721.sol';
+import "./interfaces/ILottery.sol";
 
 contract KingsCastle is Ownable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.UintSet;
@@ -17,14 +19,14 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         uint256 lastTimeRewardClaimed;
     }
 
-    IERC721 public lottery;
     uint256 public rewardRate;
     uint256 public maxClaims;
     uint256 public maxAmountOfStakers;
     uint256 public amountOfStakedTokens;
+    address public lottery;
     
-    EnumerableSet.UintSet winningTokens;
-    EnumerableSet.AddressSet stakers;
+    EnumerableSet.UintSet private winningTokens;
+    EnumerableSet.AddressSet private stakers;
     mapping(address => UserInfo) private userInfo;
 
     event RewardRateUpdate(uint256 oldValue, uint256 newValue);
@@ -32,10 +34,10 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     event Claim(address indexed account, uint256 amount);
     event InsufficientReward(address indexed account, uint256 amountNeeded, uint256 balance);
     
-    modifier onlyLottery() {
+    modifier onlyLottery {
         require(
-            msg.sender == address(lottery),
-            "only lottery can call this function"
+            msg.sender == lottery,
+            "KingsCastle: caller is not the lottery"
         );
         _;
     }
@@ -46,7 +48,6 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         uint256 _maxClaims,
         uint256 _maxAmountOfStakers
     )
-        Ownable()
     {
         transferOwnership(_owner);
         rewardRate = _rewardRate;
@@ -56,7 +57,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     
     receive() external payable {}
     
-    function setLottery(IERC721 _lottery) external onlyOwner {
+    function setLottery(address _lottery) external onlyOwner {
         lottery = _lottery;
     }
     
@@ -64,23 +65,23 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         winningTokens.add(_tokenId);
     }
     
-    function stake(uint256 _tokenId) external nonReentrant {
+    function stake(uint256 _tokenId) external {
         require(
-            msg.sender == lottery.ownerOf(_tokenId),
-            "sender is not the owner"
+            msg.sender == IERC721(lottery).ownerOf(_tokenId),
+            "KingsCastle: caller is not the owner"
         );
         require(
             winningTokens.contains(_tokenId),
-            "not a winning ticket"
+            "KingsCastle: not a winning token"
         );
         if (!stakers.contains(msg.sender)) {
             stakers.add(msg.sender);
             require(
                 stakers.length() <= maxAmountOfStakers,
-                "max amount of stakers has been reached"
+                "KingsCastle: max amount of stakers has been reached"
             );
         }
-        lottery.transferFrom(
+        IERC721(lottery).transferFrom(
             msg.sender,
             address(this),
             _tokenId
@@ -100,7 +101,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
     function updateRewardRate(uint256 _rewardRate) external onlyOwner {
         require(
             _rewardRate > 0,
-            "invalid reward rate"
+            "KingsCastle: invalid reward rate"
         );
         rewardRate = _rewardRate;
         emit RewardRateUpdate(rewardRate, _rewardRate);
@@ -136,10 +137,10 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         }
     }
     
-    function claim() public {
+    function claim() public nonReentrant {
         require(
             stakers.contains(msg.sender),
-            "forbidden to claim"
+            "KingsCastle: forbidden to claim"
         );
         UserInfo storage user = userInfo[msg.sender];
         uint256 pendingAmount = pendingRewards(msg.sender);
@@ -150,7 +151,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
             user.avaibleClaimsPerToken[tokenId]--;
             if (user.avaibleClaimsPerToken[tokenId] == 0) {
                 user.tokens.remove(tokenId);
-                winningTokens.remove(tokenId);
+                ILottery(lottery).burn(tokenId);
                 amountOfStakedTokens--;
             }
         }
@@ -175,8 +176,7 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        UserInfo storage user = userInfo[__account];
-        return user.tokens.length();
+        return userInfo[__account].tokens.length();
     }
 
     function tokenOfOwnerByIndex(
@@ -187,18 +187,17 @@ contract KingsCastle is Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        UserInfo storage user = userInfo[_account];
-        return user.tokens.at(_index);
+        return userInfo[_account].tokens.at(_index);
     }
 
     function safeRewardTransfer(address _to, uint256 _amount) internal returns (uint256) {
         uint256 balance = address(this).balance;
         if (balance >= _amount) {
-            payable(_to).transfer(_amount);
+            Address.sendValue(payable(_to), _amount);
             return _amount;
         }
         if (balance > 0) {
-            payable(_to).transfer(balance);
+            Address.sendValue(payable(_to), balance);
         }
         emit InsufficientReward(_to, _amount, balance);
         return balance;

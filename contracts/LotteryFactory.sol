@@ -3,13 +3,13 @@ pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "./interfaces/ILottery.sol";
+import "./interfaces/IDistribution.sol";
 import "./Lottery.sol";
 
-contract LotteryFactory is Ownable, ILottery {
+contract LotteryFactory is Ownable, IDistribution {
     using EnumerableSet for EnumerableSet.AddressSet;
     
-    EnumerableSet.AddressSet lotteries;
+    EnumerableSet.AddressSet private lotteries;
     
     event LotteryCreated(
         address lotteryAddress,
@@ -68,22 +68,10 @@ contract LotteryFactory is Ownable, ILottery {
     }
     
     function removeLottery(address _lottery) external onlyOwner {
-        require(
-            lotteries.contains(_lottery),
-            "lottery not found"
-        );
         lotteries.remove(_lottery);
     }
     
     function getLotteryAt(uint256 _index) external view returns (address) {
-        require(
-            lotteries.length() > 0,
-            "empty set"
-        );
-        require(
-            _index < lotteries.length(),
-            "invalid index"
-        );
         return lotteries.at(_index);
     }
 

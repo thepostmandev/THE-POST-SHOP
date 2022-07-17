@@ -2,14 +2,17 @@
 pragma solidity 0.8.7;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
-import "./base/ERC721.sol";
 import "./interfaces/IKingsCastle.sol";
 import "./interfaces/ISeaOfRedemption.sol";
 import "./interfaces/ILottery.sol";
+import "./interfaces/IDistribution.sol";
+import "./base/ERC721.sol";
 
-contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
+contract Lottery is ILottery, IDistribution, ERC721, VRFConsumerBase, Ownable, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.UintSet;
     
     enum State { OPEN, FAILED }
@@ -54,7 +57,6 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     )
         VRFConsumerBase(_VRFCoordinator, _LINK)
         ERC721(_name, _symbol, _kingsCastle, _seaOfRedemption)
-        Ownable()
     {
         transferOwnership(_owner);
         kingsCastle = _kingsCastle;
@@ -64,29 +66,28 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
         amountOfTokensPerLottery = _amountOfTokensPerLottery;
         maxSupply = _amountOfTokensPerLottery;
         distribution = _distribution;
-        statePerLottery[nonce] = State.OPEN;
         lotteryEndTime = block.timestamp + LOTTERY_DURATION;
     }
 
     receive() external payable onlyOwner {}
 
-    function buyTickets(uint256 _amount) external payable {
+    function buyTickets(uint256 _amount) external payable nonReentrant {
         require(
             _amount > 0 &&
             _amount <= amountOfTokensPerLottery,
-            "invalid amount"
+            "Lottery: invalid amount"
         );
         require(
             msg.value == _amount * price,
-            "invalid msg.value"
+            "Lottery: invalid msg.value"
         );
         require(
             currentSupply + _amount <= maxSupply,
-            "max supply exceeded"
+            "Lottery: max supply exceeded"
         );
         require(
             LINK.balanceOf(address(this)) >= CHAINLINK_FEE,
-            "not enough LINK"
+            "Lottery: not enough LINK"
         );
         for (uint256 i = 0; i < _amount; i++) {
             _safeMint(msg.sender, currentSupply);
@@ -102,19 +103,23 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     function withdrawFunds(uint256 _nonce) external {
         require(
             statePerLottery[_nonce] == State.FAILED,
-            "allowed to withdraw only when lottery failed"
+            "Lottery: not allowed to withdraw"
         );
         require(
             withdrawals[msg.sender][_nonce] == false,
-            "re-attempt to withdrawal"
+            "Lottery: re-attempt to withdraw"
         );
         require(
             tokensOfUserPerLottery[msg.sender][_nonce].length != 0,
-            "sender did not buy tokens on this lottery"
+            "Lottery: caller did not buy tokens in this lottery"
         );
         uint256 amount = tokensOfUserPerLottery[msg.sender][_nonce].length * price;
-        payable(msg.sender).transfer(amount);
+        Address.sendValue(payable(msg.sender), amount);
         withdrawals[msg.sender][_nonce] = true;
+    }
+    
+    function burn(uint256 _tokenId) external override onlyStakingPools {
+        _burn(_tokenId);
     }
 
     function setBaseURI(string memory _uri) external onlyOwner {
@@ -124,21 +129,13 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     function declareLotteryFailed() external onlyOwner {
         require(
             block.timestamp >= lotteryEndTime,
-            "it is too early to declare the lottery failed"
+            "Lottery: too early declaration"
         );
         statePerLottery[nonce] = State.FAILED;
         startNewLottery();
     }
     
     function getWinningToken(uint256 _index) external view returns (uint256) {
-        require(
-            winningTokens.length() > 0,
-            "empty set"
-        );
-        require(
-            _index < winningTokens.length(),
-            "invalid index"
-        );
         return winningTokens.at(_index);
     }
     
@@ -172,9 +169,9 @@ contract Lottery is ERC721, VRFConsumerBase, Ownable, ILottery {
     }
 
     function _distribute(address _winner) private {
-        payable(kingsCastle).transfer(distribution.toKingsCastle);
-        payable(seaOfRedemption).transfer(distribution.toSeaOfRedemption);
-        payable(devWallet).transfer(distribution.toDevWallet);
-        payable(_winner).transfer(distribution.toWinner);
+        Address.sendValue(payable(kingsCastle), distribution.toKingsCastle);
+        Address.sendValue(payable(seaOfRedemption), distribution.toSeaOfRedemption);
+        Address.sendValue(payable(devWallet), distribution.toDevWallet);
+        Address.sendValue(payable(_winner), distribution.toWinner);
     }
 }

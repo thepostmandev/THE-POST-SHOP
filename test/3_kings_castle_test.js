@@ -66,8 +66,8 @@ describe("KingsCastle", function() {
         tx = await lottery.buyTickets(49, {value: ethers.utils.parseEther("0.735")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await expect(kingsCastle.stake(0)).to.be.revertedWith("sender is not the owner");
-        await expect(kingsCastle.connect(alice).stake(0)).to.be.revertedWith("not a winning ticket");
+        await expect(kingsCastle.stake(0)).to.be.revertedWith("KingsCastle: caller is not the owner");
+        await expect(kingsCastle.connect(alice).stake(0)).to.be.revertedWith("KingsCastle: not a winning token");
         await lottery.approve(kingsCastle.address, 10);
         await kingsCastle.stake(10);
         tx = await lottery.connect(alice).buyTickets(50, {value: ethers.utils.parseEther("0.75")});
@@ -84,7 +84,7 @@ describe("KingsCastle", function() {
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
         await lottery.connect(bob).approve(kingsCastle.address, 160);
-        await expect(kingsCastle.connect(bob).stake(160)).to.be.revertedWith("max amount of stakers has been reached");
+        await expect(kingsCastle.connect(bob).stake(160)).to.be.revertedWith("KingsCastle: max amount of stakers has been reached");
     });
     
     it("Successful claim() execution", async() => {
@@ -98,7 +98,7 @@ describe("KingsCastle", function() {
         await kingsCastle.stake(10);
         await increaseTime(86399);
         await kingsCastle.claim();
-        await expect(kingsCastle.connect(bob).claim()).to.be.revertedWith("forbidden to claim");
+        await expect(kingsCastle.connect(bob).claim()).to.be.revertedWith("KingsCastle: forbidden to claim");
         await lottery.connect(alice).approve(kingsCastle.address, 60);
         await kingsCastle.connect(alice).stake(60);
         await increaseTime(86399);
@@ -106,18 +106,18 @@ describe("KingsCastle", function() {
         for (let i = 0; i < 9; i++) {
             await kingsCastle.connect(alice).claim();
         }
-        await expect(kingsCastle.connect(alice).claim()).to.be.revertedWith("forbidden to claim");
+        await expect(kingsCastle.connect(alice).claim()).to.be.revertedWith("KingsCastle: forbidden to claim");
         await increaseTime(15552000);
         await kingsCastle.claim();
         await kingsCastle.claim();
     });
     
     it("Successful onlyLottery() check", async() => {
-        await expect(kingsCastle.addWinningToken(10)).to.be.revertedWith("only lottery can call this function");
+        await expect(kingsCastle.addWinningToken(10)).to.be.revertedWith("KingsCastle: caller is not the lottery");
     });
     
     it("Successful updateRewardRate() execution", async() => {
-        await expect(kingsCastle.updateRewardRate(0)).to.be.revertedWith("invalid reward rate");
+        await expect(kingsCastle.updateRewardRate(0)).to.be.revertedWith("KingsCastle: invalid reward rate");
         await kingsCastle.updateRewardRate(100);
     });
     

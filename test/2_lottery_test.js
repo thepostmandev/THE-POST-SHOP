@@ -61,12 +61,12 @@ describe("Lottery", function() {
     });
     
     it("Successful buyTickets() execution", async() => {
-        await expect(lottery.buyTickets(0, {value: ethers.utils.parseEther("0.15")})).to.be.revertedWith("invalid amount");
-        await expect(lottery.buyTickets(2, {value: ethers.utils.parseEther("0.15")})).to.be.revertedWith("invalid msg.value");
-        await expect(lottery.buyTickets(1, {value: ethers.utils.parseEther("0.015")})).to.be.revertedWith("not enough LINK");
+        await expect(lottery.buyTickets(0, {value: ethers.utils.parseEther("0.15")})).to.be.revertedWith("Lottery: invalid amount");
+        await expect(lottery.buyTickets(2, {value: ethers.utils.parseEther("0.15")})).to.be.revertedWith("Lottery: invalid msg.value");
+        await expect(lottery.buyTickets(1, {value: ethers.utils.parseEther("0.015")})).to.be.revertedWith("Lottery: not enough LINK");
         await linkToken.transfer(lottery.address, ethers.utils.parseEther("10"));
         await lottery.buyTickets(1, {value: ethers.utils.parseEther("0.015")});
-        await expect(lottery.buyTickets(50, {value: ethers.utils.parseEther("0.75")})).to.be.revertedWith("max supply exceeded");
+        await expect(lottery.buyTickets(50, {value: ethers.utils.parseEther("0.75")})).to.be.revertedWith("Lottery: max supply exceeded");
         tx = await lottery.connect(alice).buyTickets(49, {value: ethers.utils.parseEther("0.735")});
         receipt = await tx.wait();
         balanceBefore = await ethers.provider.getBalance(alice.address);
@@ -83,13 +83,13 @@ describe("Lottery", function() {
     it("Successful withdrawFunds() and declareLotteryFailed() execution", async() => {
         await linkToken.transfer(lottery.address, ethers.utils.parseEther("10"));
         await lottery.buyTickets(1, {value: ethers.utils.parseEther("0.015")});
-        await expect(lottery.withdrawFunds(0)).to.be.revertedWith("allowed to withdraw only when lottery failed");
-        await expect(lottery.declareLotteryFailed()).to.be.revertedWith("it is too early to declare the lottery failed");
+        await expect(lottery.withdrawFunds(0)).to.be.revertedWith("Lottery: not allowed to withdraw");
+        await expect(lottery.declareLotteryFailed()).to.be.revertedWith("Lottery: too early declaration");
         await increaseTime(15552000);
         await lottery.declareLotteryFailed();
         await lottery.withdrawFunds(0);
-        await expect(lottery.connect(alice).withdrawFunds(0)).to.be.revertedWith("sender did not buy tokens on this lottery");
-        await expect(lottery.withdrawFunds(0)).to.be.revertedWith("re-attempt to withdrawal");
+        await expect(lottery.connect(alice).withdrawFunds(0)).to.be.revertedWith("Lottery: caller did not buy tokens in this lottery");
+        await expect(lottery.withdrawFunds(0)).to.be.revertedWith("Lottery: re-attempt to withdraw");
     });
     
     it("Successful tokenURI() execution", async() => {
@@ -101,11 +101,10 @@ describe("Lottery", function() {
     
     it("Successful getWinningToken() execution", async() => {
         await linkToken.transfer(lottery.address, ethers.utils.parseEther("10"));
-        await expect(lottery.getWinningToken(0)).to.be.revertedWith("empty set");
         tx = await lottery.buyTickets(50, {value: ethers.utils.parseEther("0.75")});
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
-        await expect(lottery.getWinningToken(1)).to.be.revertedWith("invalid index");
+        await expect(lottery.getWinningToken(1)).to.be.reverted;
         await lottery.getWinningToken(0);
     });
 });

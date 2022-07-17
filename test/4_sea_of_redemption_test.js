@@ -67,9 +67,9 @@ describe("SeaOfRedemption", function() {
         receipt = await tx.wait();
         await callBackWithRandomness(receipt);
         tokens = [0];
-        await expect(seaOfRedemption.stake(tokens)).to.be.revertedWith("sender is not the owner");
+        await expect(seaOfRedemption.stake(tokens)).to.be.revertedWith("SeaOfRedemption: caller is not the owner");
         tokens = [10];
-        await expect(seaOfRedemption.stake(tokens)).to.be.revertedWith("contains excluded token");
+        await expect(seaOfRedemption.stake(tokens)).to.be.revertedWith("SeaOfRedemption: contains excluded token");
         await lottery.approve(seaOfRedemption.address, 5);
         tokens = [5];
         await seaOfRedemption.stake(tokens);
@@ -90,7 +90,7 @@ describe("SeaOfRedemption", function() {
         await callBackWithRandomness(receipt);
         await lottery.connect(bob).approve(seaOfRedemption.address, 165);
         tokens = [165];
-        await expect(seaOfRedemption.connect(bob).stake(tokens)).to.be.revertedWith("max amount of stakers has been reached");
+        await expect(seaOfRedemption.connect(bob).stake(tokens)).to.be.revertedWith("SeaOfRedemption: max amount of stakers has been reached");
     });
     
     it("Successful claim() execution", async() => {
@@ -105,7 +105,7 @@ describe("SeaOfRedemption", function() {
         await seaOfRedemption.stake(tokens);
         await increaseTime(86399);
         await seaOfRedemption.claim();
-        await expect(seaOfRedemption.connect(bob).claim()).to.be.revertedWith("forbidden to claim");
+        await expect(seaOfRedemption.connect(bob).claim()).to.be.revertedWith("SeaOfRedemption: forbidden to claim");
         await lottery.connect(alice).approve(seaOfRedemption.address, 70);
         tokens = [70];
         await seaOfRedemption.connect(alice).stake(tokens);
@@ -114,18 +114,18 @@ describe("SeaOfRedemption", function() {
         for (let i = 0; i < 9; i++) {
             await seaOfRedemption.connect(alice).claim();
         }
-        await expect(seaOfRedemption.connect(alice).claim()).to.be.revertedWith("forbidden to claim");
+        await expect(seaOfRedemption.connect(alice).claim()).to.be.revertedWith("SeaOfRedemption: forbidden to claim");
         await increaseTime(15552000);
         await seaOfRedemption.claim();
         await seaOfRedemption.claim();
     });
     
     it("Successful onlyLottery() check", async() => {
-        await expect(seaOfRedemption.addExcludedToken(10)).to.be.revertedWith("only lottery can call this function");
+        await expect(seaOfRedemption.addExcludedToken(10)).to.be.revertedWith("SeaOfRedemption: caller is not the lottery");
     });
     
     it("Successful updateRewardRate() execution", async() => {
-        await expect(seaOfRedemption.updateRewardRate(0)).to.be.revertedWith("invalid reward rate");
+        await expect(seaOfRedemption.updateRewardRate(0)).to.be.revertedWith("SeaOfRedemption: invalid reward rate");
         await seaOfRedemption.updateRewardRate(100);
     });
     
